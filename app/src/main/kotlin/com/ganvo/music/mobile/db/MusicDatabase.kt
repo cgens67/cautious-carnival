@@ -132,28 +132,6 @@ class MusicDatabase(
     ],
     version = CURRENT_VERSION,
     exportSchema = true,
-    autoMigrations = [
-        AutoMigration(from = 2, to = 3),
-        AutoMigration(from = 3, to = 4),
-        AutoMigration(from = 4, to = 5),
-        AutoMigration(from = 5, to = 6, spec = Migration5To6::class),
-        AutoMigration(from = 6, to = 7, spec = Migration6To7::class),
-        AutoMigration(from = 7, to = 8, spec = Migration7To8::class),
-        AutoMigration(from = 8, to = 9),
-        AutoMigration(from = 9, to = 10, spec = Migration9To10::class),
-        AutoMigration(from = 10, to = 11, spec = Migration10To11::class),
-        AutoMigration(from = 11, to = 12, spec = Migration11To12::class),
-        AutoMigration(from = 12, to = 13, spec = Migration12To13::class),
-        AutoMigration(from = 13, to = 14, spec = Migration13To14::class),
-        AutoMigration(from = 14, to = 15),
-        AutoMigration(from = 15, to = 16),
-        AutoMigration(from = 16, to = 17, spec = Migration16To17::class),
-        AutoMigration(from = 17, to = 18),
-        AutoMigration(from = 18, to = 19, spec = Migration18To19::class),
-        AutoMigration(from = 19, to = 20, spec = Migration19To20::class),
-        AutoMigration(from = 20, to = 21, spec = Migration20To21::class),
-        AutoMigration(from = 21, to = 22),
-    ],
 )
 @TypeConverters(Converters::class)
 abstract class InternalDatabase : RoomDatabase() {
@@ -230,7 +208,7 @@ private class DatabaseCallback : RoomDatabase.Callback() {
                 db.query("PRAGMA synchronous = NORMAL").close()
                 db.query("PRAGMA temp_store = MEMORY").close()
                 db.query("PRAGMA mmap_size = 268435456").close()
-                
+
                 cleanupDuplicatePlaylistsOnOpen(db)
                 ensurePlaylistBrowseIdIndex(db)
             } catch (e: Exception) {
@@ -238,7 +216,7 @@ private class DatabaseCallback : RoomDatabase.Callback() {
             }
         }
     }
-    
+
     private fun cleanupDuplicatePlaylistsOnOpen(db: SupportSQLiteDatabase) {
         try {
             db.execSQL("""
@@ -246,8 +224,8 @@ private class DatabaseCallback : RoomDatabase.Callback() {
                     SELECT p1.id FROM playlist p1
                     WHERE p1.browseId IS NOT NULL
                     AND EXISTS (
-                        SELECT 1 FROM playlist p2 
-                        WHERE p2.browseId = p1.browseId 
+                        SELECT 1 FROM playlist p2
+                        WHERE p2.browseId = p1.browseId
                         AND p2.id != p1.id
                         AND (
                             (SELECT COUNT(*) FROM playlist_song_map WHERE playlistId = p2.id) >
@@ -261,14 +239,14 @@ private class DatabaseCallback : RoomDatabase.Callback() {
                     )
                 )
             """)
-            
+
             db.execSQL("""
                 DELETE FROM playlist WHERE id IN (
                     SELECT p1.id FROM playlist p1
                     WHERE p1.browseId IS NOT NULL
                     AND EXISTS (
-                        SELECT 1 FROM playlist p2 
-                        WHERE p2.browseId = p1.browseId 
+                        SELECT 1 FROM playlist p2
+                        WHERE p2.browseId = p1.browseId
                         AND p2.id != p1.id
                         AND (
                             (SELECT COUNT(*) FROM playlist_song_map WHERE playlistId = p2.id) >
@@ -286,7 +264,7 @@ private class DatabaseCallback : RoomDatabase.Callback() {
             Log.w(TAG, "Duplicate playlist cleanup skipped", e)
         }
     }
-    
+
     private fun ensurePlaylistBrowseIdIndex(db: SupportSQLiteDatabase) {
         try {
             db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_playlist_browseId ON playlist (browseId) WHERE browseId IS NOT NULL")
@@ -586,7 +564,7 @@ private val MIGRATION_1_2 = object : Migration(1, 2) {
         val converters = Converters()
         val artistMap = mutableMapOf<Int, String>()
         val artists = mutableListOf<ArtistEntity>()
-        
+
         db.query("SELECT * FROM artist".toSQLiteQuery()).use { cursor ->
             while (cursor.moveToNext()) {
                 val oldId = cursor.getInt(0)
@@ -606,7 +584,7 @@ private val MIGRATION_1_2 = object : Migration(1, 2) {
                 playlists.add(PlaylistEntity(id = newId, name = cursor.getString(1)))
             }
         }
-        
+
         val playlistSongMaps = mutableListOf<PlaylistSongMap>()
         db.query("SELECT * FROM playlist_song".toSQLiteQuery()).use { cursor ->
             while (cursor.moveToNext()) {
@@ -618,7 +596,7 @@ private val MIGRATION_1_2 = object : Migration(1, 2) {
             }
         }
         playlistSongMaps.sortBy { it.position }
-        
+
         val songs = mutableListOf<OldSong>()
         val songArtistMaps = mutableListOf<SongArtistMap>()
         db.query("SELECT * FROM song".toSQLiteQuery()).use { cursor ->
@@ -637,13 +615,13 @@ private val MIGRATION_1_2 = object : Migration(1, 2) {
                 songArtistMaps.add(SongArtistMap(songId = songId, artistId = artistMap[cursor.getInt(2)]!!, position = 0))
             }
         }
-        
+
         // Drop old tables and create new schema
         db.execSQL("DROP TABLE IF EXISTS song")
         db.execSQL("DROP TABLE IF EXISTS artist")
         db.execSQL("DROP TABLE IF EXISTS playlist")
         db.execSQL("DROP TABLE IF EXISTS playlist_song")
-        
+
         db.execSQL("CREATE TABLE IF NOT EXISTS `song` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `duration` INTEGER NOT NULL, `thumbnailUrl` TEXT, `albumId` TEXT, `albumName` TEXT, `liked` INTEGER NOT NULL, `totalPlayTime` INTEGER NOT NULL, `isTrash` INTEGER NOT NULL, `download_state` INTEGER NOT NULL, `create_date` INTEGER NOT NULL, `modify_date` INTEGER NOT NULL, PRIMARY KEY(`id`))")
         db.execSQL("CREATE TABLE IF NOT EXISTS `artist` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `thumbnailUrl` TEXT, `bannerUrl` TEXT, `description` TEXT, `createDate` INTEGER NOT NULL, `lastUpdateTime` INTEGER NOT NULL, PRIMARY KEY(`id`))")
         db.execSQL("CREATE TABLE IF NOT EXISTS `album` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `year` INTEGER, `thumbnailUrl` TEXT, `songCount` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `createDate` INTEGER NOT NULL, `lastUpdateTime` INTEGER NOT NULL, PRIMARY KEY(`id`))")
@@ -665,27 +643,27 @@ private val MIGRATION_1_2 = object : Migration(1, 2) {
         db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_search_history_query` ON `search_history` (`query`)")
         db.execSQL("CREATE VIEW `sorted_song_artist_map` AS SELECT * FROM song_artist_map ORDER BY position")
         db.execSQL("CREATE VIEW `playlist_song_map_preview` AS SELECT * FROM playlist_song_map WHERE position <= 3 ORDER BY position")
-        
+
         // Insert data
         artists.forEach { db.insert("artist", SQLiteDatabase.CONFLICT_ABORT, contentValuesOf(
             "id" to it.id, "name" to it.name,
             "createDate" to converters.dateToTimestamp(it.lastUpdateTime),
             "lastUpdateTime" to converters.dateToTimestamp(it.lastUpdateTime))) }
-        
+
         songs.forEach { db.insert("song", SQLiteDatabase.CONFLICT_ABORT, contentValuesOf(
             "id" to it.id, "title" to it.title, "duration" to it.duration, "liked" to it.liked,
             "totalPlayTime" to it.totalPlayTime, "isTrash" to false, "download_state" to it.downloadState,
             "create_date" to converters.dateToTimestamp(it.createDate),
             "modify_date" to converters.dateToTimestamp(it.modifyDate))) }
-        
+
         songArtistMaps.forEach { db.insert("song_artist_map", SQLiteDatabase.CONFLICT_ABORT, contentValuesOf(
             "songId" to it.songId, "artistId" to it.artistId, "position" to it.position)) }
-        
+
         playlists.forEach { db.insert("playlist", SQLiteDatabase.CONFLICT_ABORT, contentValuesOf(
             "id" to it.id, "name" to it.name,
             "createDate" to converters.dateToTimestamp(LocalDateTime.now()),
             "lastUpdateTime" to converters.dateToTimestamp(LocalDateTime.now()))) }
-        
+
         playlistSongMaps.forEach { db.insert("playlist_song_map", SQLiteDatabase.CONFLICT_ABORT, contentValuesOf(
             "playlistId" to it.playlistId, "songId" to it.songId, "position" to it.position)) }
     }
